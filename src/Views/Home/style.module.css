@@ -1,0 +1,50 @@
+.container {
+  padding: 2rem;
+  font-family: sans-serif;
+}
+
+.title {
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.tabela th,
+.tabela td {
+  border: 1px solid #ddd;
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.tabela th {
+  background-color: #f0f0f0;
+}
+
+.btnEditar {
+  background-color: #ffc107;
+  color: black;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  margin-right: 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btnDeletar {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.error {
+  color: red;
+  margin-bottom: 1rem;
+}
