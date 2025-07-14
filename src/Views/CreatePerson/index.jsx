@@ -167,22 +167,22 @@ export default function CreatePerson() {
 
         <label>
           Logradouro:
-          <input value={form.endereco.logradouro} readOnly disabled />
+          <input value={form.endereco.logradouro}   />
         </label>
 
         <label>
           Bairro:
-          <input value={form.endereco.bairro} readOnly disabled />
+          <input value={form.endereco.bairro}   />
         </label>
 
         <label>
           Cidade:
-          <input value={form.endereco.localidade} readOnly disabled />
+          <input value={form.endereco.localidade}   />
         </label>
 
         <label>
           UF:
-          <input value={form.endereco.uf} readOnly disabled />
+          <input value={form.endereco.uf}  />
         </label>
 
         <label>

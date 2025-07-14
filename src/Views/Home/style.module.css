@@ -8,10 +8,19 @@
   margin-bottom: 1.5rem;
 }
 
+.mainButton{
+  padding: 10px;
+  border-radius: 5px;
+  color: white;
+  text-decoration: none;
+  background-color: #0d6efd;
+}
+
 .tabela {
   width: 100%;
   border-collapse: collapse;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  margin-top: 20px;
 }
 
 .tabela th,
