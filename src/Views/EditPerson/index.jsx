@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import styles from './style.module.css';
+// Passo 1: Importar o useNavigate para fazer o redirecionamento
+import { useNavigate } from 'react-router-dom';
 
 export default function EditPerson() {
   const [form, setForm] = useState({
@@ -21,7 +23,10 @@ export default function EditPerson() {
   const [mensagem, setMensagem] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [clientId, setClientId] = useState(null);
+  // Inicializa o hook para navegação
+  const navigate = useNavigate();
 
+  // Funções de máscara (sem alterações)
   const maskCPF = (value) => {
     return value
       .replace(/\D/g, '')
@@ -47,6 +52,24 @@ export default function EditPerson() {
   };
 
   useEffect(() => {
+    // --- LÓGICA DE VERIFICAÇÃO DE PERMISSÃO ATUALIZADA ---
+    const userDataString = sessionStorage.getItem('user');
+
+    // Caso 1: Utilizador não está logado. Redireciona para o login.
+    if (!userDataString) {
+      navigate('/login');
+      return;
+    }
+
+    const userData = JSON.parse(userDataString);
+
+    // Caso 2: Utilizador está logado, mas não é admin. Redireciona para a home.
+    if (userData.role !== 'admin') {
+      navigate('/');
+      return;
+    }
+    // --- FIM DA VERIFICAÇÃO ---
+
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
 
@@ -60,10 +83,11 @@ export default function EditPerson() {
 
     const fetchClientData = async () => {
       try {
+        // Usa as credenciais da sessão para a requisição
         const response = await axios.get(`http://localhost:8080/clientes/${id}`, {
           auth: {
-            username: 'Samuel',
-            password: 'Chmpm-2005',
+            username: userData.username,
+            password: userData.password,
           },
         });
 
@@ -87,13 +111,16 @@ export default function EditPerson() {
       } catch (err) {
         console.error('Erro ao buscar dados do cliente', err);
         setMensagem('Não foi possível carregar os dados do cliente.');
+        if (err.response && err.response.status === 401) {
+            navigate('/login');
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchClientData();
-  }, []);
+  }, [navigate]); // Adicionado 'navigate' às dependências do useEffect
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -129,10 +156,12 @@ export default function EditPerson() {
     };
 
     try {
+      // Pega as credenciais da sessão para a requisição PUT
+      const userData = JSON.parse(sessionStorage.getItem('user'));
       await axios.put(`http://localhost:8080/clientes/${clientId}`, payload, {
         auth: {
-          username: 'Samuel',
-          password: 'Chmpm-2005',
+          username: userData.username,
+          password: userData.password,
         },
       });
       setMensagem('Cliente atualizado com sucesso!');
@@ -147,7 +176,7 @@ export default function EditPerson() {
     : '';
 
   if (isLoading) {
-    return <div className={styles.container}><p>A carregar dados do cliente...</p></div>;
+    return <div className={styles.container}><p>A carregar...</p></div>;
   }
 
   return (
@@ -155,16 +184,15 @@ export default function EditPerson() {
       <h1 className={styles.title}>Editar Cliente</h1>
       {mensagem && <p className={messageClass}>{mensagem}</p>}
       <form onSubmit={handleSubmit} className={styles.form}>
+        {/* ... (o resto do seu formulário permanece igual) ... */}
         <label>
           Nome:
           <input name="nome" value={form.nome} onChange={handleChange} required />
         </label>
-
         <label>
           CPF:
           <input name="cpf" value={form.cpf} onChange={(e) => setForm({...form, cpf: maskCPF(e.target.value)})} required />
         </label>
-
         <label>
           Telefone:
           <input
@@ -176,7 +204,6 @@ export default function EditPerson() {
             required
           />
         </label>
-
         <label>
           Email:
           <input
@@ -186,7 +213,6 @@ export default function EditPerson() {
             required
           />
         </label>
-
         <label>
           CEP:
           <input
@@ -196,32 +222,26 @@ export default function EditPerson() {
             required
           />
         </label>
-
         <label>
           Logradouro:
           <input name="endereco.logradouro" value={form.endereco.logradouro} onChange={handleChange} />
         </label>
-
         <label>
           Bairro:
           <input name="endereco.bairro" value={form.endereco.bairro} onChange={handleChange} />
         </label>
-
         <label>
           Cidade:
           <input name="endereco.localidade" value={form.endereco.localidade} onChange={handleChange} />
         </label>
-
         <label>
           UF:
           <input name="endereco.uf" value={form.endereco.uf} onChange={handleChange} />
         </label>
-
         <label>
           Complemento:
           <input name="endereco.complemento" value={form.endereco.complemento} onChange={handleChange} />
         </label>
-
         <button type="submit">Salvar Alterações</button>
       </form>
     </div>

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import styles from './style.module.css';
+import { useNavigate } from 'react-router-dom';
 
 export default function CreatePerson() {
   const [form, setForm] = useState({
@@ -19,187 +20,164 @@ export default function CreatePerson() {
   });
 
   const [mensagem, setMensagem] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const maskCPF = (value) => {
-    return value
-      .replace(/\D/g, '')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
-      .slice(0, 14);
-  };
+  // Funções de máscara
+  const maskCPF = (value) => value.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2').slice(0, 14);
+  const maskPhone = (value) => value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2').slice(0, 15);
+  const maskCEP = (value) => value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').slice(0, 9);
 
-  const handleCepChange = async (e) => {
-    const cepSemMascara = e.target.value.replace(/\D/g, '');
-    setForm({ ...form, endereco: { ...form.endereco, cep: e.target.value } });
+  // Verificação de permissão
+  useEffect(() => {
+    const userDataString = sessionStorage.getItem('user');
 
-    if (cepSemMascara.length === 8) {
-      try {
-        const response = await axios.get(`http://localhost:8080/cep/${cepSemMascara}`, {
-          auth: {
-            username: 'Samuel',
-            password: 'Chmpm-2005',
-          },
-        });
+    if (!userDataString) {
+      navigate('/login');
+      return;
+    }
 
-        setForm((prev) => ({
-          ...prev,
-          endereco: {
-            ...prev.endereco,
-            logradouro: response.data.logradouro,
-            bairro: response.data.bairro,
-            localidade: response.data.localidade,
-            uf: response.data.uf,
-          },
-        }));
-      } catch (err) {
-        console.error('Erro ao buscar CEP', err);
+    const userData = JSON.parse(userDataString);
+
+    if (userData.role !== 'admin') {
+      navigate('/');
+      return;
+    }
+  }, [navigate]);
+
+  const handleCepBlur = async (e) => {
+    const cep = e.target.value.replace(/\D/g, '');
+    if (cep.length !== 8) return;
+
+    setIsLoading(true);
+    try {
+      const { data } = await axios.get(`https://viacep.com.br/ws/${cep}/json/`);
+      if (data.erro) {
+        setMensagem('CEP não encontrado.');
+        return;
       }
+      setForm(prev => ({
+        ...prev,
+        endereco: {
+          ...prev.endereco,
+          logradouro: data.logradouro,
+          bairro: data.bairro,
+          localidade: data.localidade,
+          uf: data.uf,
+        }
+      }));
+      setMensagem(null);
+    } catch (error) {
+      setMensagem("Erro ao buscar o CEP.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    if (name === 'cpf') {
+      setForm({ ...form, cpf: maskCPF(value) });
+    } else if (name === 'telefone') {
+      setForm({ ...form, telefones: [{ ...form.telefones[0], numero: maskPhone(value) }] });
+    } else if (name === 'cep') {
+      setForm(prev => ({ ...prev, endereco: { ...prev.endereco, cep: maskCEP(value) } }));
+    } else if (name.startsWith('endereco.')) {
+      const field = name.split('.')[1];
+      setForm(prev => ({ ...prev, endereco: { ...prev.endereco, [field]: value } }));
+    } else {
+      setForm({ ...form, [name]: value });
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
+    setMensagem(null);
 
     const payload = {
-      nome: form.nome,
+      ...form,
       cpf: form.cpf.replace(/\D/g, ''),
-      telefones: form.telefones.map(tel => ({...tel, numero: tel.numero.replace(/\D/g, '')})),
-      emails: form.emails,
+      telefones: form.telefones.map(tel => ({ ...tel, numero: tel.numero.replace(/\D/g, '') })),
       endereco: {
-          ...form.endereco,
-          cep: form.endereco.cep.replace(/\D/g, '')
+        ...form.endereco,
+        cep: form.endereco.cep.replace(/\D/g, ''),
       },
     };
 
     try {
+      const userData = JSON.parse(sessionStorage.getItem('user'));
       await axios.post('http://localhost:8080/clientes', payload, {
         auth: {
-          username: 'Samuel',
-          password: 'Chmpm-2005',
+          username: userData.username,
+          password: userData.password,
         },
       });
       setMensagem('Cliente cadastrado com sucesso!');
+      // Limpa o formulário após o sucesso
+      setForm({
+        nome: '', cpf: '', telefones: [{ tipo: 'CELULAR', numero: '' }], emails: [''],
+        endereco: { cep: '', logradouro: '', bairro: '', localidade: '', uf: '', complemento: '' },
+      });
     } catch (err) {
-      console.error('Erro ao cadastrar cliente', err);
       setMensagem('Erro ao cadastrar cliente.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const messageClass = mensagem
-    ? `${styles.message} ${mensagem === 'Cliente cadastrado com sucesso!' ? styles.success : styles.error}`
+    ? `${styles.message} ${mensagem.includes('sucesso') ? styles.success : styles.error}`
     : '';
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>Registar Cliente</h1>
+      <h1 className={styles.title}>Cadastrar Novo Cliente</h1>
       {mensagem && <p className={messageClass}>{mensagem}</p>}
       <form onSubmit={handleSubmit} className={styles.form}>
         <label>
           Nome:
-          <input
-            name="nome"
-            value={form.nome}
-            onChange={handleChange}
-            required
-          />
+          <input name="nome" value={form.nome} onChange={handleChange} required />
         </label>
-
         <label>
           CPF:
-          <input
-            name="cpf"
-            value={form.cpf}
-            onChange={(e) => setForm({ ...form, cpf: maskCPF(e.target.value) })}
-            placeholder="000.000.000-00"
-            required
-          />
+          <input name="cpf" value={form.cpf} onChange={handleChange} required />
         </label>
-
         <label>
           Telefone:
-          <input
-            value={form.telefones[0].numero}
-            onChange={(e) => {
-              const maskedPhone = e.target.value
-                .replace(/\D/g, '')
-                .replace(/(\d{2})(\d)/, '($1) $2')
-                .replace(/(\d{5})(\d)/, '$1-$2')
-                .slice(0, 15);
-              const novo = { ...form.telefones[0], numero: maskedPhone };
-              setForm({ ...form, telefones: [novo] });
-            }}
-            placeholder="(00) 00000-0000"
-            required
-          />
+          <input name="telefone" value={form.telefones[0].numero} onChange={handleChange} required />
         </label>
-
         <label>
           Email:
-          <input
-            type="email"
-            value={form.emails[0]}
-            onChange={(e) => setForm({ ...form, emails: [e.target.value] })}
-            required
-          />
+          <input type="email" value={form.emails[0]} onChange={(e) => setForm({ ...form, emails: [e.target.value] })} required />
         </label>
-
         <label>
           CEP:
-          <input
-            value={form.endereco.cep}
-            onChange={(e) => {
-                const maskedCep = e.target.value
-                    .replace(/\D/g, '')
-                    .replace(/(\d{5})(\d)/, '$1-$2')
-                    .slice(0, 9);
-                handleCepChange({ target: { value: maskedCep } });
-            }}
-            placeholder="00000-000"
-            required
-          />
+          <input name="cep" value={form.endereco.cep} onChange={handleChange} onBlur={handleCepBlur} required />
         </label>
-
         <label>
           Logradouro:
-          <input value={form.endereco.logradouro}   />
+          <input name="endereco.logradouro" value={form.endereco.logradouro} onChange={handleChange} />
         </label>
-
         <label>
           Bairro:
-          <input value={form.endereco.bairro}   />
+          <input name="endereco.bairro" value={form.endereco.bairro} onChange={handleChange} />
         </label>
-
         <label>
           Cidade:
-          <input value={form.endereco.localidade}   />
+          <input name="endereco.localidade" value={form.endereco.localidade} onChange={handleChange} />
         </label>
-
         <label>
           UF:
-          <input value={form.endereco.uf}  />
+          <input name="endereco.uf" value={form.endereco.uf} onChange={handleChange} />
         </label>
-
         <label>
           Complemento:
-          <input
-            name="complemento"
-            value={form.endereco.complemento}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                endereco: { ...form.endereco, complemento: e.target.value },
-              })
-            }
-          />
+          <input name="endereco.complemento" value={form.endereco.complemento} onChange={handleChange} />
         </label>
-
-        <button type="submit">Registar</button>
+        <button type="submit" disabled={isLoading}>
+          {isLoading ? 'A cadastrar...' : 'Cadastrar Cliente'}
+        </button>
       </form>
     </div>
   );
